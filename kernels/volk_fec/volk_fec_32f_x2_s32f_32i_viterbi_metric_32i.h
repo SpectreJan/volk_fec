@@ -5,6 +5,7 @@
 static inline void norm(float *metric, int num_states)
 {
   float min = metric[0];
+  int minmi = 0;
   int s;
   for(s = 1; s < num_states; s++)
   {
@@ -47,7 +48,7 @@ a_n[s    ]******a_{n+1}[s]
            *   *
 a_n[s+S/2]******a_{n+1}[s+1]
 */
-static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned int *trace,
+static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned char *trace,
                                                           float *alpha, 
                                                           const float *gamma,
                                                           const int length,                                                        
@@ -61,32 +62,44 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned 
   float *metrics_new, *metrics_old;
   void *tmp;
   int n, s;
+  
   //for every Infobit = Trellisstep
   metrics_new = &alpha[num_states];
-  metrics_old = alpha;
+  metrics_old = &alpha[0];
+ // printf("NumStates: %d\nInfobits: %d\n", num_states, nibits);
   for(n = 0; n < nibits; n++)
   {
     // Do a Butterfly for 2 States
     for(s= 0; s < num_states/2; s++)
     {
-      m0 = metrics_old[s] + gamma[OS[s<<1]+n];
-      m1 = metrics_old[s+num_states/2] + gamma[OS[(s+num_states/2)<<1] + n];
-      m2 = metrics_old[s] + gamma[OS[s<<1 + 1]+n];
-      m3 = metrics_old[s+num_states/2] + gamma[OS[(s+num_states/2)<<1 + 1] + n];
+      m0 = metrics_old[2*s] + gamma[OS[4*s]*nibits+n];
+      m1 = metrics_old[2*s+1] + gamma[OS[4*s+2]*nibits+n];
+      m2 = metrics_old[2*s] + gamma[OS[4*s+1]*nibits+n];
+      m3 = metrics_old[2*s+1] + gamma[OS[4*s+3]*nibits+n];
       
+      // Get decision for trace based on minimum euclidean distance
+      //printf("m0: %f m1: %f m2: %f m3: %f\n", m0, m1, m2, m3);
       decision0 = (m0 - m1) > 0;
       decision1 = (m2 - m3) > 0;
 
-      metrics_new[2*s] = decision0 ? m0 : m1;
-      metrics_new[2*s+1] = decision0 ? m0 : m1;
+      //if((n == nibits-1) && (s = num_states/2-1))
+      //  printf("Decision0:%d Decision1: %d\n", decision0, decision1);
+      // Save metric for next iteration
+      metrics_new[s] = decision0 ? m1 : m0;
+      metrics_new[s+num_states/2] = decision1 ? m3 : m2;
+
+      // Save trace by packing 8 decision into one char
+      trace[n*num_states+s]   = decision0;
+      trace[n*num_states+s+num_states/2] = decision1;
+      //printf("trace: %d   trace: %d\n", trace[n*num_states+2*s], trace[n*num_states+2*s+1]);
     }
 
+    // Normalize metrics and swap pointers for next trellisstep
     norm(metrics_new, num_states);
     tmp = (void*) metrics_old;
     metrics_old = metrics_new;
     metrics_new = (float*) tmp;
   }
-
 }
 
 
@@ -132,7 +145,7 @@ a_n[s    ]******a_{n+1}[s]
 a_n[s+S/2]******a_{n+1}[s+1]
 */
 
-static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned int *trace,
+static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned char *trace,
                                                           float *alpha, 
                                                           const float *gamma,
                                                           const int length,
