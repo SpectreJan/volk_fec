@@ -78,12 +78,9 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned 
       m3 = metrics_old[2*s+1] + gamma[OS[4*s+3]*nibits+n];
       
       // Get decision for trace based on minimum euclidean distance
-      //printf("m0: %f m1: %f m2: %f m3: %f\n", m0, m1, m2, m3);
       decision0 = (m0 - m1) > 0;
       decision1 = (m2 - m3) > 0;
 
-      //if((n == nibits-1) && (s = num_states/2-1))
-      //  printf("Decision0:%d Decision1: %d\n", decision0, decision1);
       // Save metric for next iteration
       metrics_new[s] = decision0 ? m1 : m0;
       metrics_new[s+num_states/2] = decision1 ? m3 : m2;
@@ -91,7 +88,6 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned 
       // Save trace by packing 8 decision into one char
       trace[n*num_states+s]   = decision0;
       trace[n*num_states+s+num_states/2] = decision1;
-      //printf("trace: %d   trace: %d\n", trace[n*num_states+2*s], trace[n*num_states+2*s+1]);
     }
 
     // Normalize metrics and swap pointers for next trellisstep
@@ -136,13 +132,13 @@ double dur_loop, dur_instruction;
 
 /* Update state metric and use butterfly structure
 
-a_n[s    ]******a_{n+1}[s]
+a_n[2*s    ]******a_{n+1}[s]
            *   *
             * *
              *
             * *
            *   *
-a_n[s+S/2]******a_{n+1}[s+1]
+a_n[2*s+1]******a_{n+1}[s+num_states/2]
 */
 
 static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned char *trace,
