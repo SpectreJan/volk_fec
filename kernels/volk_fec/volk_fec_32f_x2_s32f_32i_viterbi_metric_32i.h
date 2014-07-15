@@ -48,7 +48,7 @@ a_n[s    ]******a_{n+1}[s]
            *   *
 a_n[s+S/2]******a_{n+1}[s+1]
 */
-static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned char *trace,
+static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned int *trace,
                                                           float *alpha, 
                                                           const float *gamma,
                                                           const int length,                                                        
@@ -60,13 +60,13 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned 
   int decision0, decision1; // Decision that is stored in Trace Pointer
   float m0,m1,m2,m3;
   float *metrics_new, *metrics_old;
-  void *tmp;
+  float *tmp;
   int n, s;
   
   //for every Infobit = Trellisstep
   metrics_new = &alpha[num_states];
   metrics_old = &alpha[0];
- // printf("NumStates: %d\nInfobits: %d\n", num_states, nibits);
+  //printf("NumStates: %d\nInfobits: %d\n", num_states, nibits);
   for(n = 0; n < nibits; n++)
   {
     // Do a Butterfly for 2 States
@@ -92,10 +92,11 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned 
 
     // Normalize metrics and swap pointers for next trellisstep
     norm(metrics_new, num_states);
-    tmp = (void*) metrics_old;
+    tmp = metrics_old;
     metrics_old = metrics_new;
-    metrics_new = (float*) tmp;
+    metrics_new = tmp;
   }
+  alpha = &metrics_old[0];
 }
 
 
@@ -141,14 +142,93 @@ a_n[2*s    ]******a_{n+1}[s]
 a_n[2*s+1]******a_{n+1}[s+num_states/2]
 */
 
-static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned char *trace,
+static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned int *trace,
                                                           float *alpha, 
                                                           const float *gamma,
                                                           const int length,
                                                           const int *OS,
                                                           unsigned int num_points)
 {
+  int nibits = length;
+  int quarter_points = num_points/4;
+  __m128i decision0[1], decision1[1]; // Decision that is stored in Trace Pointer
+  __m128 m[4];
+  __m128 metrics_new128[2], metrics_old128[2];
+  __m128 gamma128[4];
+  void *tmp;
+  float *metrics_new, *metrics_old;
+  unsigned int *trace_ptr;
+  int n, s;
 
+  metrics_new = &alpha[num_points];
+  metrics_old = &alpha[0];
+  trace_ptr = &trace[0];
+  for(n = 0; n < nibits; n++)
+  {
+    for(s = 0; s < quarter_points/2; s++)
+    {
+      // Set all registers
+      gamma128[0] = _mm_set_ps(gamma[OS[16*s+12]*nibits+n], 
+                               gamma[OS[16*s+8 ]*nibits+n],
+                               gamma[OS[16*s+4 ]*nibits+n], 
+                               gamma[OS[16*s   ]*nibits+n]);
+      gamma128[1] = _mm_set_ps(gamma[OS[16*s+14]*nibits+n],
+                               gamma[OS[16*s+10]*nibits+n], 
+                               gamma[OS[16*s+6 ]*nibits+n], 
+                               gamma[OS[16*s+2 ]*nibits+n]);
+      gamma128[2] = _mm_set_ps(gamma[OS[16*s+13]*nibits+n], 
+                               gamma[OS[16*s+9 ]*nibits+n],
+                               gamma[OS[16*s+5 ]*nibits+n], 
+                               gamma[OS[16*s+1 ]*nibits+n]);
+      gamma128[3] = _mm_set_ps(gamma[OS[16*s+15]*nibits+n], 
+                               gamma[OS[16*s+11]*nibits+n],
+                               gamma[OS[16*s+7 ]*nibits+n], 
+                               gamma[OS[16*s+3 ]*nibits+n]);
+
+      metrics_old128[0] = _mm_set_ps(metrics_old[8*s +6 ], metrics_old[8*s+4], 
+                                     metrics_old[8*s+2], metrics_old[8*s]);
+      metrics_old128[1] = _mm_set_ps(metrics_old[8*s+7], metrics_old[8*s+5], 
+                                     metrics_old[8*s+3], metrics_old[8*s+1]);
+      
+      // Calculate path metrics
+      m[0] = _mm_add_ps(metrics_old128[0], gamma128[0]);
+      m[1] = _mm_add_ps(metrics_old128[1], gamma128[1]);
+      m[2] = _mm_add_ps(metrics_old128[0], gamma128[2]);
+      m[3] = _mm_add_ps(metrics_old128[1], gamma128[3]);
+
+      // Calculate Decisions and cast to __m128i
+      *decision0 = (__m128i) _mm_cmpgt_ps(_mm_sub_ps(m[0], m[1]), _mm_setzero_ps());
+      *decision1 = (__m128i) _mm_cmpgt_ps(_mm_sub_ps(m[2], m[3]), _mm_setzero_ps());
+
+      // Is m[i] or m[i+1] minimum, calculate by complicated bitshift operatiońs to gain speed
+      metrics_new128[0] = _mm_or_ps(_mm_and_ps((__m128)*decision0, m[1]), _mm_andnot_ps((__m128)*decision0,m[0])); 
+      metrics_new128[1] = _mm_or_ps(_mm_and_ps((__m128)*decision1, m[3]), _mm_andnot_ps((__m128)*decision1,m[2]));
+      *decision0 = _mm_and_si128(*decision0, _mm_set1_epi32(1));
+      *decision1 = _mm_and_si128(*decision1, _mm_set1_epi32(1));
+
+
+      // Store decisions and path metrics
+      _mm_store_si128((__m128i*)&trace_ptr[n*num_points+4*s], *decision0);
+      _mm_store_si128((__m128i*)&trace_ptr[n*num_points+4*s+num_points/2], *decision1);
+        
+      _mm_store_ps(&metrics_new[4*s], metrics_new128[0]);
+      _mm_store_ps(&metrics_new[4*s+num_points/2], metrics_new128[1]);     
+    }
+
+    // Normalize metrics and swap pointers for next trellisstep
+    norm(metrics_new, num_points);
+    // if(n == nibits-1)
+    // {  
+    //   for(s = 0; s < num_points; s++)
+    //   {
+    //     printf("MetricsSSE[%d] %f\n", s, metrics_new[s]);
+    //   }
+    // }
+    tmp = (void*) metrics_old;
+    metrics_old = metrics_new;
+    metrics_new = (float*) tmp;  
+  }
+  alpha = metrics_new;
 }
 
 #endif /* LV_HAVE_SSE */
