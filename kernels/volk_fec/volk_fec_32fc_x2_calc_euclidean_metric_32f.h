@@ -10,10 +10,9 @@
   \brief calculates euclidean metric for two input vectors and stores their
          their result a the third vector
   \param O FSM Output cardinality
-  \param D Dimensionality of input vector
-  \param table Vector with valid symbols
-  \param input Input vector
-  \param metric Metrics are stored in this vector
+  \param a_vector Input samples
+  \param b_vector Symbol table
+  \param c_vector Branch metrics are stored in this vector
 */
 
 static inline void volk_fec_32fc_x2_calc_euclidean_metric_32f_generic(float *c_vector,

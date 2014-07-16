@@ -27,15 +27,10 @@ static inline void norm(float *metric, int num_states)
 /*!
   \brief Update viterbi state metric
   \param trace Trace Matrix
-  \param norm Norm value to normalize state metrics
   \param alpha State Metric Buffer
   \param gamma Branch Metrics Matrix
-  \param in_len Number of input symbols
-  \param step Current trellisstep
   \param length Trellis length
-  \param PS Previous State Matrix
   \param OS Output Matrix
-  \param Previous Input Matrix
   \param num_points The number of States in the trellis
 */
 /* Update state metric and use butterfly structure
@@ -72,11 +67,12 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_generic(unsigned 
     // Do a Butterfly for 2 States
     for(s= 0; s < num_states/2; s++)
     {
-      m0 = metrics_old[2*s] + gamma[OS[4*s]*nibits+n];
+      m0 = metrics_old[2*s  ] + gamma[OS[4*s]*nibits+n];
       m1 = metrics_old[2*s+1] + gamma[OS[4*s+2]*nibits+n];
-      m2 = metrics_old[2*s] + gamma[OS[4*s+1]*nibits+n];
+      m2 = metrics_old[2*s  ] + gamma[OS[4*s+1]*nibits+n];
       m3 = metrics_old[2*s+1] + gamma[OS[4*s+3]*nibits+n];
       
+      //printf("%f %f %f %f\n", m0, m1, m2, m3);
       // Get decision for trace based on minimum euclidean distance
       decision0 = (m0 - m1) > 0;
       decision1 = (m2 - m3) > 0;
@@ -119,15 +115,10 @@ double dur_loop, dur_instruction;
 /*!
   \brief Update viterbi state metric
   \param trace Trace Matrix
-  \param norm Norm value to normalize state metrics
   \param alpha State Metric Buffer
   \param gamma Branch Metrics Matrix
-  \param in_len Number of input symbols
-  \param step Current trellisstep
   \param length Trellis length
-  \param PS Previous State Matrix
   \param OS Output Matrix
-  \param Previous Input Matrix
   \param num_points The number of States in the trellis
 */
 
@@ -167,7 +158,7 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned i
   {
     for(s = 0; s < quarter_points/2; s++)
     {
-      // Set all registers
+      // Set all registers for branch metrics
       gamma128[0] = _mm_set_ps(gamma[OS[16*s+12]*nibits+n], 
                                gamma[OS[16*s+8 ]*nibits+n],
                                gamma[OS[16*s+4 ]*nibits+n], 
@@ -200,7 +191,7 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned i
       *decision0 = (__m128i) _mm_cmpgt_ps(_mm_sub_ps(m[0], m[1]), _mm_setzero_ps());
       *decision1 = (__m128i) _mm_cmpgt_ps(_mm_sub_ps(m[2], m[3]), _mm_setzero_ps());
 
-      // Is m[i] or m[i+1] minimum, calculate by complicated bitshift operatiońs to gain speed
+      // Is m[i] or m[i+1] minimum, calculated by complicated bitshift operatiońs to gain speed (see Karn)
       metrics_new128[0] = _mm_or_ps(_mm_and_ps((__m128)*decision0, m[1]), _mm_andnot_ps((__m128)*decision0,m[0])); 
       metrics_new128[1] = _mm_or_ps(_mm_and_ps((__m128)*decision1, m[3]), _mm_andnot_ps((__m128)*decision1,m[2]));
       *decision0 = _mm_and_si128(*decision0, _mm_set1_epi32(1));
@@ -217,13 +208,6 @@ static inline void volk_fec_32f_x2_s32f_32i_viterbi_metric_32i_a_sse4(unsigned i
 
     // Normalize metrics and swap pointers for next trellisstep
     norm(metrics_new, num_points);
-    // if(n == nibits-1)
-    // {  
-    //   for(s = 0; s < num_points; s++)
-    //   {
-    //     printf("MetricsSSE[%d] %f\n", s, metrics_new[s]);
-    //   }
-    // }
     tmp = (void*) metrics_old;
     metrics_old = metrics_new;
     metrics_new = (float*) tmp;  
