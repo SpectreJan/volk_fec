@@ -56,8 +56,7 @@ static inline void volk_fec_32f_x2_s32f_32i_x2_forward_recursion_32f_a_sse4(floa
   __m128 metrics_new128[2], metrics_old128[2];
   __m128 gamma128[4];
   float *metrics_new, *metrics_old;
-  int t[16];
-  int n,s,i; // counting variables
+  int n,s; // counting variables
   int quarter_points = num_points/4;
 
   metrics_new = &alpha[num_points];
