@@ -1,5 +1,5 @@
-#ifndef INCLUDED_VOLD_FEC_32f_s32f_32i_forward_recursion_32f_u_H
-#define INCLUDED_VOLD_FEC_32f_s32f_32i_forward_recursion_32f_u_H
+#ifndef INCLUDED_VOLD_FEC_32f_x2_s32f_32i_x2_forward_recursion_32f_u_H
+#define INCLUDED_VOLD_FEC_32f_x2_s32f_32i_x2_forward_recursion_32f_u_H
 
 
 #include <stdlib.h>
@@ -42,8 +42,8 @@ static inline void volk_fec_32f_x2_s32f_32i_x2_forward_recursion_32f_generic(flo
 #endif /*LV_HAVE_GENERIC*/
 #endif /*INCLUDED_VOLD_FEC_32f_s32f_32i_forward_recursion_32f_u_H*/
 
-#ifndef INCLUDED_VOLD_FEC_32f_s32f_32i_calc_branch_metric_32f_a_H
-#define INCLUDED_VOLD_FEC_32f_s32f_32i_calc_branch_metric_32f_a_H
+#ifndef INCLUDED_VOLD_FEC_32f_x2_s32f_32i_x2_forward_recursion_32f_a_H
+#define INCLUDED_VOLD_FEC_32f_x2_s32f_32i_x2_forward_recursion_32f_a_H
 
 #ifdef LV_HAVE_SSE4_1
 #include "smmintrin.h"
