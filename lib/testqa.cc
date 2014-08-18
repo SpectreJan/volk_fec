@@ -1,6 +1,7 @@
 #include "qa_utils.h"
 #include <volk_fec/volk_fec.h>
 #include <boost/test/unit_test.hpp>
+VOLK_RUN_TESTS(volk_fec_16i_x2_calc_euclidean_metricpuppet_16i, 1e-4, 0, 20480, 1);
 VOLK_RUN_TESTS(volk_fec_32f_s32f_normalize, 1e-4, 100, 20462, 1);
 VOLK_RUN_TESTS(volk_fec_32f_s32f_norm, 1e-4, 3.0, 20462, 1);
 
